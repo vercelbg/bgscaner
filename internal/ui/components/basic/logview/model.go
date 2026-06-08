@@ -67,7 +67,7 @@ func New(l *layout.Layout, log *logger.Logger, title string) *Model {
 
 		viewport: viewport.New(0, 0),
 
-		padding:           2,
+		padding:           5,
 		containerMaxWidth: l.Body.Width - 10,
 		showBorder:        true,
 
