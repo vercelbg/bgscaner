@@ -7,13 +7,14 @@ import (
 )
 
 func (m *Model) Update(msg tea.Msg) (ui.Component, tea.Cmd) {
-	switch msg := msg.(type) {
+	var cmds []tea.Cmd
 
+	switch msg := msg.(type) {
 	case tea.KeyMsg:
-		cmd := m.Keys.Check(msg)
-		if cmd != nil {
-			return m, cmd
+		if cmd := m.Keys.Check(msg); cmd != nil {
+			cmds = append(cmds, cmd)
 		}
+
 		if msg.String() == "?" {
 			m.FullHelp = !m.FullHelp
 			m.updateTableSize()
@@ -21,11 +22,15 @@ func (m *Model) Update(msg tea.Msg) (ui.Component, tea.Cmd) {
 
 	case tea.WindowSizeMsg:
 		m.updateTableSize()
+		m.BubbleTable.SetStyles(tableStyles())
 		return m, nil
-
 	}
 
-	var cmd tea.Cmd
-	m.BubbleTable, cmd = m.BubbleTable.Update(msg)
-	return m, cmd
+	var tableCmd tea.Cmd
+	m.BubbleTable, tableCmd = m.BubbleTable.Update(msg)
+	if tableCmd != nil {
+		cmds = append(cmds, tableCmd)
+	}
+
+	return m, tea.Batch(cmds...)
 }
