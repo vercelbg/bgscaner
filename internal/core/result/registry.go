@@ -10,7 +10,6 @@ import (
 )
 
 // Result directories used by different scan types.
-//
 // Each directory stores CSV files produced by a specific scan engine.
 const (
 	ICMPResultDir       = "result/icmp/"
@@ -22,15 +21,12 @@ const (
 	SlipStreamResultDir = "result/slipstream/"
 )
 
-// ListResultFiles returns metadata for all result CSV files matching
-// the given scan type.
+// GetResultTypeFiles returns metadata for all result CSV files matching the given scan type.
 //
 // For performance reasons, this function only reads filesystem metadata
 // and does NOT count the number of IPs stored inside each file.
 // As a result, the IPCount field is always set to -1.
-//
-// Use CountIPsInFile if an accurate IP count is required.
-func ListResultFiles(searchType ResultType) ([]ResultFile, error) {
+func GetResultTypeFiles(searchType ResultType) ([]ResultFile, error) {
 	dirs := resolveResultDirs(searchType)
 	if len(dirs) == 0 {
 		return nil, nil
@@ -41,7 +37,6 @@ func ListResultFiles(searchType ResultType) ([]ResultFile, error) {
 	for _, d := range dirs {
 		entries, err := os.ReadDir(d.dir)
 		if err != nil {
-			// Directory may not exist or be inaccessible.
 			continue
 		}
 
@@ -66,7 +61,7 @@ func ListResultFiles(searchType ResultType) ([]ResultFile, error) {
 				CreatedTime: info.ModTime(),
 				Type:        d.rType,
 				Path:        filepath.Join(d.dir, name),
-				IPCount:     -1, // intentionally skipped
+				IPCount:     -1,
 			})
 		}
 	}
@@ -74,11 +69,18 @@ func ListResultFiles(searchType ResultType) ([]ResultFile, error) {
 	return results, nil
 }
 
-// GetResultFileInfo returns metadata for a single result file path.
+// GetResultFiles returns all metadata files across every scan engine type.
+// Serves as a backward-compatible shortcut for background processors.
+func GetResultFiles() ([]ResultFile, error) {
+	return GetResultTypeFiles(ResultAll)
+}
+
+// ReadResultFileIPs reads filesystem statistical info for a single file path
+// and returns an initialized ResultFile schema.
 //
-// The returned ResultFile contains filesystem metadata only.
-// IPCount is set to -1 and must be calculated explicitly if needed.
-func GetResultFileInfo(path string) (ResultFile, error) {
+// Like GetResultTypeFiles, it sets the IPCount to -1 to avoid scanning
+// file lines synchronously. Use CountIPsInFile to compute the exact total.
+func ReadResultFileIPs(path string) (ResultFile, error) {
 	info, err := os.Stat(path)
 	if err != nil {
 		return ResultFile{}, fmt.Errorf("cannot read result file: %w", err)
@@ -90,58 +92,69 @@ func GetResultFileInfo(path string) (ResultFile, error) {
 		CreatedTime: info.ModTime(),
 		Type:        ResultTypeFromPath(path),
 		Path:        path,
-		IPCount:     -1, // intentionally skipped
+		IPCount:     -1,
 	}, nil
 }
 
-// NormalizeResultFileName ensures that a result file name has the `.csv` extension.
-//
-// If the provided name does not already end with `.csv`, the extension
-// will be appended automatically. Existing `.csv` extensions are preserved.
-//
-// Example:
-//
-//	NormalizeResultFileName("scan_1")     → "scan_1.csv"
-//	NormalizeResultFileName("scan_1.csv") → "scan_1.csv"
+// NormalizeResultFileName ensures a clean filename wrapper ends with `.csv`
+// while safely stripping any internal absolute or relative path segments.
 func NormalizeResultFileName(name string) string {
-	if !filemanager.HasExt(name, ".csv") {
-		return name + ".csv"
+	baseName := filepath.Base(name)
+	if !filemanager.HasExt(baseName, ".csv") {
+		return baseName + ".csv"
 	}
-	return name
+	return baseName
 }
 
-// ResultTypeFromPath infers the result type from a filesystem path.
+// ResultTypeFromPath infers the corresponding ResultType identifier dynamically from a filesystem path context.
 //
-// The detection is based on known result directory segments.
-// If no match is found, ResultICMP is used as a safe default.
+// It sanitizes platform-specific slashes and evaluates input bounds against existing configurations,
+// guaranteeing single-source-of-truth accuracy without relying on hardcoded strings.
 func ResultTypeFromPath(path string) ResultType {
-	switch {
-	case strings.Contains(path, ICMPResultDir):
-		return ResultICMP
-	case strings.Contains(path, TCPResultDir):
-		return ResultTCP
-	case strings.Contains(path, HTTPResultDir):
-		return ResultHTTP
-	case strings.Contains(path, ResolveResultDir):
-		return ResultRESOLVE
-	case strings.Contains(path, DNSTTResultDir):
-		return ResultDNSTT
-	case strings.Contains(path, SlipStreamResultDir):
-		return ResultSLIPSTREAM
-	case strings.Contains(path, XRAYResultDir):
-		return ResultXRAY
-	default:
-		return ResultICMP
+	cleanedPath := filepath.Clean(path)
+
+	// Dynamically evaluate against registered engines
+	for _, d := range resolveResultDirs(ResultAll) {
+		if strings.Contains(cleanedPath, filepath.Clean(d.dir)) {
+			return d.rType
+		}
 	}
+
+	return ResultICMP
 }
 
-// CountIPsInFile counts the number of IP entries inside a result file.
-//
-// This operation reads the file contents and may be relatively expensive
-// for large result sets.
+// CountIPsInFile calculates the total number of IP entries recorded inside a result file
+// by invoking the core tracking package's file counting mechanics.
 func CountIPsInFile(file ResultFile) (int64, error) {
-	path := filepath.Join(resolveDir(file.Type), file.Name)
-	return Count(path)
+	return Count(file.Path)
+}
+
+// BuildResultFilePath generates a clean, standardized, timestamp-suffixed path for a
+// new scan output target inside an authorized output directory block.
+func BuildResultFilePath(targetDir, prefix string) (string, error) {
+	if prefix == "" {
+		return "", fmt.Errorf("prefix cannot be empty")
+	}
+
+	cleanTarget := filepath.Clean(targetDir)
+
+	// Validate targetDir against mapped registry to maintain secure filesystem boundaries
+	var isValid bool
+	for _, d := range resolveResultDirs(ResultAll) {
+		if filepath.Clean(d.dir) == cleanTarget {
+			isValid = true
+			break
+		}
+	}
+
+	if !isValid {
+		return "", fmt.Errorf("invalid or untracked result directory: %s", targetDir)
+	}
+
+	timestamp := time.Now().Format("20060102_150405")
+	filename := fmt.Sprintf("%s_%s.csv", prefix, timestamp)
+
+	return filepath.Join(cleanTarget, filename), nil
 }
 
 // -----------------------------------------------------------------------------
@@ -153,8 +166,6 @@ type resultDir struct {
 	rType ResultType
 }
 
-// resolveResultDirs returns filesystem directories matching the
-// requested result type.
 func resolveResultDirs(searchType ResultType) []resultDir {
 	all := []resultDir{
 		{ICMPResultDir, ResultICMP},
@@ -179,50 +190,11 @@ func resolveResultDirs(searchType ResultType) []resultDir {
 	return nil
 }
 
-// resolveDir returns the directory path associated with a result type.
 func resolveDir(rType ResultType) string {
-	switch rType {
-	case ResultICMP:
-		return ICMPResultDir
-	case ResultTCP:
-		return TCPResultDir
-	case ResultHTTP:
-		return HTTPResultDir
-	case ResultXRAY:
-		return XRAYResultDir
-	case ResultRESOLVE:
-		return ResolveResultDir
-	case ResultDNSTT:
-		return DNSTTResultDir
-	case ResultSLIPSTREAM:
-		return SlipStreamResultDir
-	default:
-		return ""
+	for _, d := range resolveResultDirs(ResultAll) {
+		if d.rType == rType {
+			return d.dir
+		}
 	}
-}
-
-// BuildResultFilePath generates a new result file path using a prefix
-// and the current timestamp.
-//
-// Example:
-//
-//	result/tcp/tcp_20260315_143022.csv
-//
-// The prefix typically identifies the scan target or configuration.
-func BuildResultFilePath(resultDir, prefix string) (string, error) {
-	switch resultDir {
-	case ICMPResultDir, TCPResultDir, HTTPResultDir, XRAYResultDir, DNSTTResultDir, ResolveResultDir, SlipStreamResultDir:
-		// valid directory
-	default:
-		return "", fmt.Errorf("invalid result directory")
-	}
-
-	if prefix == "" {
-		return "", fmt.Errorf("prefix cannot be empty")
-	}
-
-	timestamp := time.Now().Format("20060102_150405")
-	filename := fmt.Sprintf("%s%s.csv", prefix, timestamp)
-
-	return filepath.Join(resultDir, filename), nil
+	return ""
 }
