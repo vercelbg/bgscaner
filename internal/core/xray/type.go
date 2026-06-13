@@ -2,6 +2,8 @@ package xray
 
 import "time"
 
+const addressPlaceholder = "$ADDRESS"
+
 // XrayConfig represents the root configuration structure used to
 // generate an Xray-core configuration file.
 //

@@ -1,7 +1,7 @@
 package xray
 
 import (
-	"bgscan/internal/core/filemanager"
+	"bgscan/internal/core/fileutil"
 	"fmt"
 	"net"
 	"path/filepath"
@@ -62,7 +62,7 @@ func GenerateConfig(outboundName, ip string, port uint16) (string, error) {
 	outputPath := getNewXrayConfigName(ip)
 
 	// Write config file
-	if err := filemanager.WriteJSONFile(outputPath, config); err != nil {
+	if err := fileutil.WriteJSONFile(outputPath, config); err != nil {
 		return "", fmt.Errorf("failed to write config file: %w", err)
 	}
 
