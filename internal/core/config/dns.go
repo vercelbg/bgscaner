@@ -44,7 +44,6 @@ type ResolverConfig struct {
 	EDNSBufSize     uint16     `toml:"ends_buffer_size"`
 	Timeout         DurationMS `toml:"timeout"`
 	Tries           int        `toml:"tries"`
-	ShuffleIPs      bool       `toml:"shuffle_ips"`
 	RandomSubdomain bool       `toml:"random_subdomain"`
 	AcceptedRCodes  []string   `toml:"accepted_rcodes"`
 	CheckDPI        bool       `toml:"check_dpi"`

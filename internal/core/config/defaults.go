@@ -5,12 +5,13 @@ import "time"
 // DefaultGeneralConfig returns the default configuration for general scanner behavior.
 func DefaultGeneralConfig() *GeneralConfig {
 	return &GeneralConfig{
-		StatusInterval:        NewDurationMS(1 * time.Second),
-		StopAfterFound:        0,
-		MaxIPsToTest:          0,
-		ChannelBufferMultiple: 5,
-		ChainMode:             "simple",
-		Verbose:               false,
+		StatusInterval: NewDurationMS(1 * time.Second),
+		StopAfterFound: 0,
+		MaxIPsToTest:   0,
+		MaxIPsPerStage: 100_000,
+		BatchSize:      5_000,
+		Shuffled:       false,
+		ChainMode:      "simple",
 	}
 }
 
@@ -71,7 +72,6 @@ func DefaultXrayConfig() *XrayConfig {
 		UploadSpeed:          50,
 		PreScanType:          "none",
 		Timeout:              NewDurationMS(6 * time.Second),
-		ShuffleIPs:           true,
 		PrefixOutput:         "xray_",
 	}
 }
@@ -88,7 +88,6 @@ func DefaultDNSConfig() *DNSConfig {
 			EDNSBufSize:     1234,
 			Timeout:         NewDurationMS(2 * time.Second),
 			Tries:           1,
-			ShuffleIPs:      true,
 			RandomSubdomain: true,
 			AcceptedRCodes:  []string{"noerror", "nxdomain"},
 			CheckDPI:        true,

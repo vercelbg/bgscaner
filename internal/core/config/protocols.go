@@ -144,7 +144,6 @@ type XrayConfig struct {
 	DownloadSpeed        int              `toml:"download_speed"`
 	UploadSpeed          int              `toml:"upload_speed"`
 	Timeout              DurationMS       `toml:"timeout"`
-	ShuffleIPs           bool             `toml:"shuffle_ips"`
 	PrefixOutput         string           `toml:"prefix_output"`
 	PreScanType          string           `toml:"pre_scan_type"`
 }

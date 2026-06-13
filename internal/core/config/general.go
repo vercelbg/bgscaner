@@ -7,12 +7,13 @@ import (
 
 // GeneralConfig defines global scanner behavior and execution settings.
 type GeneralConfig struct {
-	StatusInterval        DurationMS `toml:"status_interval"`
-	StopAfterFound        int        `toml:"stop_after_found"`
-	MaxIPsToTest          int        `toml:"max_ips_to_test"`
-	ChainMode             string     `toml:"chain_mode"`
-	ChannelBufferMultiple int        `toml:"channel_buffer_multiple"`
-	Verbose               bool       `toml:"verbose"`
+	StatusInterval DurationMS `toml:"status_interval"`
+	StopAfterFound int        `toml:"stop_after_found"`
+	MaxIPsToTest   int        `toml:"max_ips_to_test"`
+	ChainMode      string     `toml:"chain_mode"`
+	MaxIPsPerStage int        `toml:"max_ips_per_stage"`
+	BatchSize      int        `toml:"batch_size"`
+	Shuffled       bool       `toml:"shuffled"`
 }
 
 // Normalize validates general configuration values and adjusts them to
@@ -45,20 +46,30 @@ func (g *GeneralConfig) Normalize(rep *ValidationReport) {
 		rep.AddChange("General.MaxIPsToTest", old, g.MaxIPsToTest, "negative → default")
 	}
 
-	// ChannelBufferMultiple must be within a safe range.
+	// MaxIPsPerStage must be within a safe range.
 	normalizeInt(
-		"General.ChannelBufferMultiple",
-		&g.ChannelBufferMultiple,
+		"General.MaxIPsPerStage",
+		&g.MaxIPsPerStage,
 		1,
-		1000,
-		def.ChannelBufferMultiple,
+		10_000_000,
+		def.MaxIPsPerStage,
+		rep,
+	)
+
+	// BatchSize must be within a safe range.
+	normalizeInt(
+		"General.BatchSize",
+		&g.BatchSize,
+		1,
+		10_000_000,
+		def.BatchSize,
 		rep,
 	)
 
 	// Validate ChainMode.
 	mode := strings.ToLower(strings.TrimSpace(g.ChainMode))
 	switch mode {
-	case "simple", "advanced", "parallel":
+	case "sequential", "simple", "streaming", "parallel", "batch", "pipeline":
 		g.ChainMode = mode
 	default:
 		old := g.ChainMode
@@ -67,7 +78,7 @@ func (g *GeneralConfig) Normalize(rep *ValidationReport) {
 			"General.ChainMode",
 			old,
 			g.ChainMode,
-			"invalid → default (allowed: simple, advanced, parallel)",
+			"invalid → default (allowed: sequential, streaming,  batch)",
 		)
 	}
 }
