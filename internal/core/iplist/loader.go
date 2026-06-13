@@ -2,7 +2,7 @@ package iplist
 
 import (
 	"fmt"
-	"net"
+	"net/netip"
 )
 
 // CopyIPFile copies an IP list file from srcPath to dstPath.
@@ -10,7 +10,7 @@ import (
 // so invalid rows are automatically skipped.
 func CopyIPFile(srcPath, dstPath string) error {
 	return WriteCSV(dstPath, func(write func(IPList) error) error {
-		return ReadCSV(srcPath, func(entry IPList) error {
+		return ReadCSV(srcPath, func(entry IPList, _ int64) error {
 			return write(entry)
 		})
 	})
@@ -21,8 +21,7 @@ func CopyIPFile(srcPath, dstPath string) error {
 // For large lists prefer streaming APIs like ReadCSV or StreamActiveIPs.
 func LoadAll(path string) ([]IPList, error) {
 	items := make([]IPList, 0, 1024)
-
-	err := ReadCSV(path, func(entry IPList) error {
+	err := ReadCSV(path, func(entry IPList, _ int64) error {
 		items = append(items, entry)
 		return nil
 	})
@@ -33,8 +32,7 @@ func LoadAll(path string) ([]IPList, error) {
 // CountIPs counts the total number of valid entries in an IP list file.
 func CountIPs(path string) (uint64, error) {
 	var total uint64
-
-	err := ReadCSV(path, func(entry IPList) error {
+	err := ReadCSV(path, func(entry IPList, _ int64) error {
 		total += countIPEntry(entry.IP)
 		return nil
 	})
@@ -45,8 +43,7 @@ func CountIPs(path string) (uint64, error) {
 // CountActiveIPs counts the number of enabled entries in the file.
 func CountActiveIPs(path string) (uint64, error) {
 	var total uint64
-
-	err := ReadCSV(path, func(entry IPList) error {
+	err := ReadCSV(path, func(entry IPList, _ int64) error {
 		if entry.Enable {
 			total += countIPEntry(entry.IP)
 		}
@@ -64,7 +61,7 @@ func ValidateFile(path string) error {
 		invalid int
 	)
 
-	err := ReadCSV(path, func(entry IPList) error {
+	err := ReadCSV(path, func(entry IPList, _ int64) error {
 		total++
 
 		if entry.IP == "" {
@@ -95,7 +92,7 @@ func MergeFiles(dstPath string, srcPaths ...string) error {
 	return WriteCSV(dstPath, func(write func(IPList) error) error {
 		for _, src := range srcPaths {
 
-			err := ReadCSV(src, func(entry IPList) error {
+			err := ReadCSV(src, func(entry IPList, _ int64) error {
 				if _, ok := seen[entry.IP]; ok {
 					return nil
 				}
@@ -113,15 +110,18 @@ func MergeFiles(dstPath string, srcPaths ...string) error {
 	})
 }
 
+// countIPEntry handles total IP calculation using zero-allocation netip primitives.
 func countIPEntry(ipStr string) uint64 {
-	// CIDR case
-	if _, ipNet, err := net.ParseCIDR(ipStr); err == nil {
-		ones, bits := ipNet.Mask.Size()
-		return 1 << (bits - ones)
+	if prefix, err := netip.ParsePrefix(ipStr); err == nil {
+		addr := prefix.Masked().Addr()
+		maxBits := 32
+		if addr.Is6() {
+			maxBits = 128
+		}
+		return uint64(1) << (maxBits - prefix.Bits())
 	}
 
-	// Single IP
-	if net.ParseIP(ipStr) != nil {
+	if _, err := netip.ParseAddr(ipStr); err == nil {
 		return 1
 	}
 
