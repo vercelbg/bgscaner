@@ -18,11 +18,6 @@ workers = 200
 # Useful for distinguishing results between different scanner types.
 prefix_output = "tcp_"
 
-# Shuffle the order of IPs before scanning.
-# This helps distribute traffic more evenly and avoids predictable
-# sequential scanning patterns.
-shuffle_ips = true
-
 # Number of retry attempts per target.
 # Higher values increase reliability but also increase scan duration.
 tries = 1

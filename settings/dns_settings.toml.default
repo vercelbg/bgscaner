@@ -48,9 +48,6 @@ timeout = 2000
 # (regardless of Rcode) is received, retrying stops immediately.
 tries = 2
 
-# ── Behavior ─────────────────────────────────────────────────
-# Shuffle the order of IPs before scanning to distribute network load.
-shuffle_ips = true
 
 # If enabled, generates a random subdomain (e.g., x1y2z3.google.com)
 # to bypass resolver caches and force a fresh recursive lookup.
