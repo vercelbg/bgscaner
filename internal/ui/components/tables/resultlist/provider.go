@@ -9,6 +9,7 @@ import (
 	"bgscan/internal/ui/shared/layout"
 	"os"
 	"path/filepath"
+	"slices"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/dustin/go-humanize"
@@ -49,7 +50,11 @@ func (p *provider) Load() ([]result.ResultFile, error) {
 		logger.UIError("Failed to load result logs: %v", err)
 		return nil, err
 	}
-	logger.DebugDump("rs", files)
+
+	slices.SortFunc(files, func(i, j result.ResultFile) int {
+		return j.CreatedTime.Compare(i.CreatedTime)
+	})
+
 	logger.UIInfo("Loaded %d result files from disk", len(files))
 	return files, nil
 }
