@@ -95,7 +95,7 @@ jobs:
 
       - name: Run build
         shell: bash
-        run: ./scripts/release.sh "${{ matrix.target }}" all .
+        run: mkdir -p ./dist && ./scripts/release.sh "${{ matrix.target }}" all .
 
       - name: Verify dist output exists
         shell: bash
