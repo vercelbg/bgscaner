@@ -220,7 +220,6 @@ run_release() {
 # ==============================================================================
 # POST PROCESS: ZIP ONLY (CLEAN OUTPUT)
 # ==============================================================================
-
 package_artifacts() {
   log "Packaging artifacts (zip-only output)"
 
@@ -228,23 +227,22 @@ package_artifacts() {
     fail "Failed to enter dist directory: $DEST_DIR"
 
   local count=0
-  for file in *; do
-    [ -f "$file" ] || continue
-    local zip_name="${file}.zip"
 
-    info "Compressing: $file -> $zip_name"
-    zip -q "$zip_name" "$file" ||
-      fail "Failed to zip $file"
+  for item in *; do
+    [ -e "$item" ] || continue
 
-    rm -f "$file"
+    local zip_name="${item}.zip"
+
+    info "Compressing: $item -> $zip_name"
+
+    zip -rq "$zip_name" "$item" ||
+      fail "Failed to zip $item"
+
+    rm -rf "$item"
     count=$((count + 1))
   done
 
-  if [ "$count" -eq 0 ]; then
-    warn "No raw artifacts found to package in $DEST_DIR"
-  else
-    success "Packaged ${count} artifact(s) into zip archives"
-  fi
+  success "Packaged ${count} artifact(s)"
 }
 
 # ==============================================================================
