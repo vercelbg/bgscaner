@@ -100,7 +100,7 @@ jobs:
       - name: Verify dist output exists
         shell: bash
         run: |
-          set -euo pipefail
+          ls dist/ && set -euo pipefail
           if [ -z "$(ls -A dist/ 2>/dev/null)" ]; then
             echo "ERROR: dist/ is empty after build for target '${{ matrix.target }}'" >&2
             exit 1
