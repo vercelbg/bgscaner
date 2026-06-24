@@ -32,8 +32,9 @@ set -euo pipefail
 
 OS="${1:-linux}"
 ARCH="${2:-all}"
-PROJECT_DIR="${3:-$PWD}"
+PROJECT_DIR="$(cd "${3:-$PWD}" && pwd)"
 DEST_DIR="$PROJECT_DIR/dist"
+ROOT_DIR="$PROJECT_DIR"
 PROJECT_DIR="$(cd "${3:-$PWD}" && pwd)" 
 INSTALLER="$ROOT_DIR/scripts/install-builder.sh"
 BUILDER="$ROOT_DIR/bgscan-builder"
