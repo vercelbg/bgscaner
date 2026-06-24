@@ -102,12 +102,19 @@ log "Generating SHA256 checksums"
 cd "$DIST_DIR"
 
 FILES=()
+echo "DEBUG: cwd is $(pwd)"
+echo "DEBUG: glob expands to: $(echo *)"
 
 for file in *; do
-  [[ -f "$file" ]] || continue
+  echo "DEBUG: considering '$file'"
+  [[ -f "$file" ]] || { echo "DEBUG: '$file' is not a regular file, skipping"; continue; }
   sha256sum "$file" >>"$CHECKSUM_FILE"
   FILES+=("$file")
 done
+
+echo "DEBUG: FILES count = ${#FILES[@]}"
+echo "DEBUG: checksum file contents:"
+cat "$CHECKSUM_FILE"
 
 # ==============================================================================
 # RELEASE NOTES START
